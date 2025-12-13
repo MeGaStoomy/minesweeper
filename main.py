@@ -1,21 +1,26 @@
-import tkinter as tk
+from tkinter import *
+import random
 
-main = tk.Tk()
-frame = tk.Frame(main)
+main = Tk()
+main.title("Minesweeper")
+main.geometry("423x423")
+main.resizable(False,False)
+main.configure(background='#4c545c')
 
-def svgPhotoImage(file_path_name):
-        from PIL import Image,ImageTk
-        import rsvg,cairo 
-        svg = rsvg.Handle(file=file_path_name)
-        width, height = svg.get_dimension_data()[:2]
-        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, int(width), int(height))
-        context = cairo.Context(surface)
-        #context.set_antialias(cairo.ANTIALIAS_SUBPIXEL)
-        svg.render_cairo(context)
-        tk_image=ImageTk.PhotoImage('RGBA')
-        image=Image.frombuffer('RGBA',(width,height),surface.get_data(),'raw','BGRA',0,1)
-        tk_image.paste(image)
-        return(tk_image)
-        
-tk_image = svgPhotoImage(r'images/closed.svg')
-frame.configure(image=tk_image)
+
+class Jeu:
+    def __init__(self):
+        self.listeCases = [[Case() for _ in range(9)] for _ in range(9)]
+        self.preparation()
+
+    def preparation(self):
+        text = Label(main, anchor=CENTER, text='Difficultés : ', bg='#4c545c')
+        text.pack()
+
+class Case:
+    def __init__(self):
+        self.mine = False
+        self.flag = False
+        self.etat = 'closed'
+
+Jeu()
