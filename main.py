@@ -31,25 +31,40 @@ textures = load_textures('images')
 
 current_widget = None
 def gameCellPress(event):
-    global current_widget
-    event.widget.config(image=textures['type0'])
-    current_widget = event.widget
-def gameCellUnpressed(event):
-    global current_widget
-    event.widget.config(image=textures['closed'])
-    if current_widget:
-        current_widget.config(image=textures['closed'])
-    if event.type == '5':
-        print((event.widget.cell.x, event.widget.cell.y))
-    print(event.type)
+    if not(event.widget.cell.revealed) and not(event.widget.cell.flagged):
+        global current_widget
+        event.widget.config(image=textures['type0'])
+        current_widget = event.widget
+def gameCellRelease(event):
+    if not(event.widget.cell.revealed) and not(event.widget.cell.flagged):
+        global current_widget
+        if (current_widget) and not(current_widget.cell.flagged) and (event.type == '35'):
+            current_widget.config(image=textures['closed'])
+        current_widget = event.widget.winfo_containing(event.x_root, event.y_root)
+        if (event.type == '5') and not(current_widget.cell.flagged):
+            current_widget.cell.revealed = True
+        else:
+            event.widget.config(image=textures['closed'])
 def gameCellMotion(event):
-    global current_widget
-    widget = event.widget.winfo_containing(event.x_root, event.y_root)
-    if (widget) and (widget.cell.cellType == 'gameCell') and (current_widget != widget):
-        if current_widget:
-            current_widget.event_generate("<<Leave>>")
-        current_widget = widget
-        current_widget.event_generate("<<Enter>>")
+    if not(event.widget.cell.revealed) and not(event.widget.cell.flagged):
+        global current_widget
+        # current_widget = widget under the mouse previously
+        widget = event.widget.winfo_containing(event.x_root, event.y_root)
+        # widget = widget under the mouse currently
+        if (widget) and (widget.cell.cellType == 'gameCell') and (current_widget != widget):
+            if current_widget:
+                current_widget.event_generate("<<Leave>>")
+            current_widget = widget
+            # current_widget is updated
+            current_widget.event_generate("<<Enter>>")
+def gameCellFlag(event):
+    if not(event.widget.cell.revealed):
+        if event.widget.cell.flagged:
+            event.widget.cell.flagged = False
+            event.widget.config(image=textures['closed'])
+        else:
+            event.widget.cell.flagged = True
+            event.widget.config(image=textures['flag'])
 
 
 
@@ -69,10 +84,11 @@ class Jeu:
             for x in range(len(self.listeGameLabels[y])):
                 label = self.listeGameLabels[y][x]
                 label.bind('<Button-1>', gameCellPress)
-                label.bind('<ButtonRelease-1>', gameCellUnpressed)
+                label.bind('<ButtonRelease-1>', gameCellRelease)
                 label.bind('<B1-Motion>', gameCellMotion)
                 label.bind('<<Enter>>', gameCellPress)
-                label.bind('<<Leave>>', gameCellUnpressed)
+                label.bind('<<Leave>>', gameCellRelease)
+                label.bind('<Button-3>', gameCellFlag)
                 label.cell = self.listeGameCells[y][x]
                 self.listeGameCells[y][x].label = label
                 label.place(x=38+x*38, y=38*5+y*38)
@@ -140,6 +156,11 @@ class Cell:
         self.x = x
         self.y = y
         self.label = None
+        self.flagged = False
+        self.mine = False
+        self.revealed = False
+
+    
 
 jeuActuel = Jeu()
 atexit.register(main.destroy)
