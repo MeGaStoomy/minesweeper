@@ -20,11 +20,11 @@ def load_textures(folder):
                 path = os.path.join(folder, filename)
                 img = Image.open(path)
                 if name in ['face_lose', 'face_pressed', 'face_unpressed']:
-                    img = img.resize( (62, 62), Image.Resampling.LANCZOS )
+                    img = img.resize( (76, 76), Image.Resampling.LANCZOS )
                 elif img.size == (94,94):
                     img = img.resize( (38, 38), Image.Resampling.LANCZOS )
                 else:
-                    img = img.resize( (26, 50), Image.Resampling.LANCZOS )
+                    img = img.resize( (40, 76), Image.Resampling.LANCZOS )
                 dictTextures[name] = ImageTk.PhotoImage(img, master=main)
         return dictTextures
 textures = load_textures('images')
@@ -65,6 +65,13 @@ def gameCellFlag(event):
         else:
             event.widget.cell.flagged = True
             event.widget.config(image=textures['flag'])
+def smileyFacePress(event):
+    event.widget.config(image=textures['face_pressed'])
+def smileyFaceRelease(event):
+    event.widget.config(image=textures['face_unpressed'])
+    event.widget.cell.jeu.resetWindow()
+    Jeu()
+    
 
 
 
@@ -80,16 +87,18 @@ class Jeu:
 
     def askDifficulty(self):
         self.difficulty = None
+        self.createBorderCells()
         while not(self.difficulty):
             self.difficulty = input('Which difficulty ? (easy, normal, hard) : ')
             if (self.difficulty != 'easy') and (self.difficulty != 'normal') and (self.difficulty != 'hard'):
                 self.difficulty = None
                 print('!Invalid answer!')
+        self.resetWindow()
         self.gameIsOver = False
                 
     def createBorderCells(self):
         textures
-        if self.difficulty == 'easy':
+        if (self.difficulty == 'easy') or (self.difficulty == None):
             main.title('Minesweeper - Easy Difficulty')
             self.width = 9+2
             self.height = 9+6
@@ -135,7 +144,14 @@ class Jeu:
                 label.place(x=38*x, y=38*y)
 
     def createTopBarCells(self):
-        pass
+        textures
+        self.smileyFaceCell = Cell('smileyFace', 0, 0, self)
+        self.smileyFaceLabel = Label(main, image=textures['face_unpressed'], height=76, width=76, bd=0, highlightthickness=0)
+        self.smileyFaceLabel.place(relx=0.5, y=95, anchor=CENTER)
+        self.smileyFaceCell.label = self.smileyFaceLabel
+        self.smileyFaceLabel.cell = self.smileyFaceCell
+        self.smileyFaceLabel.bind('<Button-1>', smileyFacePress)
+        self.smileyFaceLabel.bind('<ButtonRelease-1>', smileyFaceRelease)
 
     def createGameCells(self):
         textures
@@ -179,6 +195,7 @@ class Jeu:
     def gameOver(self):
         self.gameIsOver = True
         main.title('Minesweeper - You lost!')
+        self.smileyFaceLabel.config(image=textures['face_lose'])
         for tab in self.listeGameCells:
             for cell in tab:
                 if not(cell.revealed):
@@ -196,6 +213,13 @@ class Jeu:
         x = (screen_w // 2) - (w // 2)
         y = (screen_h // 2) - (h // 2)
         main.geometry(f"{w}x{h}+{x}+{y}")
+
+    def resetWindow(self):
+        self.gameIsOver = True
+        for widget in main.winfo_children():
+            widget.destroy()
+        main.title("Minesweeper")
+        main.geometry("442x442")
 
     
 
@@ -232,6 +256,7 @@ class Cell:
                     for i in range(3):
                         for j in [[-1, 0, 1], [-1, 1], [-1, 0, 1]][i]:
                             try:
+                                assert  (0 <= self.y+1-i < self.jeu.height-6) and (0 <= self.x+j < self.jeu.width-2)
                                 self.jeu.listeGameCells[self.y+1-i][self.x+j].openArea()
                             except: pass
             elif self == current_widget.cell:
