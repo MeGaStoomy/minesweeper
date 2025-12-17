@@ -20,9 +20,12 @@ def load_textures(folder):
                 path = os.path.join(folder, filename)
                 img = Image.open(path)
                 if name in ['face_lose', 'face_pressed', 'face_unpressed']:
-                    img = img.resize( (76, 76), Image.Resampling.LANCZOS )
+                    dictTextures[name + "_small"] = ImageTk.PhotoImage(img.resize( (45, 45), Image.Resampling.LANCZOS ), master=main)
+                    img = Image.open(path).resize( (70, 70), Image.Resampling.LANCZOS)
                 elif img.size == (94,94):
                     img = img.resize( (38, 38), Image.Resampling.LANCZOS )
+                elif img.size == (541, 336):
+                    img = img.resize( (146, 91), Image.Resampling.LANCZOS )
                 else:
                     img = img.resize( (40, 76), Image.Resampling.LANCZOS )
                 dictTextures[name] = ImageTk.PhotoImage(img, master=main)
@@ -61,14 +64,17 @@ def gameCellFlag(event):
     if not(event.widget.cell.revealed) and not(event.widget.cell.jeu.gameIsOver):
         if event.widget.cell.flagged:
             event.widget.cell.flagged = False
+            event.widget.cell.jeu.mineCount += 1
             event.widget.config(image=textures['closed'])
         else:
             event.widget.cell.flagged = True
+            event.widget.cell.jeu.mineCount -= 1
             event.widget.config(image=textures['flag'])
+        event.widget.cell.jeu.showMineCount()
 def smileyFacePress(event):
-    event.widget.config(image=textures['face_pressed'])
+    event.widget.config(image=textures['face_pressed_small' if event.widget.cell.jeu.difficulty == 'easy' else 'face_pressed'])
 def smileyFaceRelease(event):
-    event.widget.config(image=textures['face_unpressed'])
+    event.widget.config(image=textures['face_unpressed_small' if event.widget.cell.jeu.difficulty == 'easy' else 'face_unpressed'])
     event.widget.cell.jeu.resetWindow()
     Jeu()
     
@@ -82,8 +88,8 @@ class Jeu:
         self.createTopBarCells()
         self.createGameCells()
         self.placeMines()
-        self.time = -1
-        self.timer()
+        self.showMineCount()
+        self.timer(-1)
 
     def askDifficulty(self):
         self.difficulty = None
@@ -146,12 +152,41 @@ class Jeu:
     def createTopBarCells(self):
         textures
         self.smileyFaceCell = Cell('smileyFace', 0, 0, self)
-        self.smileyFaceLabel = Label(main, image=textures['face_unpressed'], height=76, width=76, bd=0, highlightthickness=0)
+        if self.difficulty == 'easy':
+                self.smileyFaceLabel = Label(main, image=textures['face_unpressed_small'], height=45, width=45, bd=0, highlightthickness=0)
+        else:
+                self.smileyFaceLabel = Label(main, image=textures['face_unpressed'], height=70, width=70, bd=0, highlightthickness=0)
         self.smileyFaceLabel.place(relx=0.5, y=95, anchor=CENTER)
         self.smileyFaceCell.label = self.smileyFaceLabel
         self.smileyFaceLabel.cell = self.smileyFaceCell
         self.smileyFaceLabel.bind('<Button-1>', smileyFacePress)
         self.smileyFaceLabel.bind('<ButtonRelease-1>', smileyFaceRelease)
+        self.digNumbersList = [[], []]
+        self.digLabelsList = [[], []]
+        if self.difficulty == 'easy':
+                Label(main, image=textures['nums_background'], height=91, width=146, bd=0, highlightthickness=0).place(x=40, y=95, anchor=W)
+                Label(main, image=textures['nums_background'], height=91, width=146, bd=0, highlightthickness=0).place(x=233 + (self.width-11)*38, y=95, anchor=W)
+        else:
+                Label(main, image=textures['nums_background'], height=91, width=146, bd=0, highlightthickness=0).place(x=50, y=95, anchor=W)
+                Label(main, image=textures['nums_background'], height=91, width=146, bd=0, highlightthickness=0).place(x=222 + (self.width-11)*38, y=95, anchor=W)
+        for i in range(3):
+                self.digNumbersList[0].append(Cell('digNumber', i, 0, self))
+                self.digLabelsList[0].append(Label(main, image=textures['d0'], height=76, width=40, bd=0, highlightthickness=0))
+                if self.difficulty == 'easy':
+                        self.digLabelsList[0][i].place(x=47+46*i, y=95, anchor=W)
+                else:
+                        self.digLabelsList[0][i].place(x=57+46*i, y=95, anchor=W)
+                self.digNumbersList[0][i].label = self.digLabelsList[0][i]
+                self.digLabelsList[0][i] = self.digNumbersList[0][i]
+        for i in range(3):
+                self.digNumbersList[1].append(Cell('digNumber', i, 0, self))
+                self.digLabelsList[1].append(Label(main, image=textures['d0'], height=76, width=40, bd=0, highlightthickness=0))
+                if self.difficulty == 'easy':
+                        self.digLabelsList[1][i].place(x=240+46*i, y=95, anchor=W)
+                else:
+                        self.digLabelsList[1][i].place(x=229 + 46*i + (self.width-11)*38, y=95, anchor=W)
+                self.digNumbersList[1][i].label = self.digLabelsList[1][i]
+                self.digLabelsList[1][i] = self.digNumbersList[1][i]
 
     def createGameCells(self):
         textures
@@ -178,24 +213,38 @@ class Jeu:
         elif self.difficulty == 'normal':
             self.mineCount = 40
         else:
-            self.mineCount = 99
+            self.mineCount = 80
         for _ in range(self.mineCount):
             randHeight = random.randint(0, self.height-7)
             randWidth = random.randint(0, self.width-3)
             if not(self.listeGameCells[randHeight][randWidth].mine):
                 self.listeGameCells[randHeight][randWidth].mine = True
 
-    def timer(self):
-        if not(self.time == 999):
+    def showMineCount(self):
+        textures
+        digNumbers = self.digNumbersList[0]
+        mineCount = str(self.mineCount)
+        mineCount = "0"*(3-len(mineCount)) + mineCount
+        for i in range(3):
+            digNumbers[i].label.config(image=textures[f'd{mineCount[i]}'])
+
+    def timer(self, time):
+        self.time = time
+        if not(time == 999):
             self.time += 1
-        print(self.time)
+        digNumbers = self.digNumbersList[1]
+        strTime = str(self.time)
+        strTime = "0"*(3-len(strTime)) + strTime
+        for i in range(3):
+            try: digNumbers[i].label.config(image=textures[f'd{strTime[i]}'])
+            except: pass
         if not(self.gameIsOver):
-            main.after(1000, self.timer)
+            main.after(1000, self.timer, self.time)
 
     def gameOver(self):
         self.gameIsOver = True
         main.title('Minesweeper - You lost!')
-        self.smileyFaceLabel.config(image=textures['face_lose'])
+        self.smileyFaceLabel.config(image=textures['face_lose_small' if self.difficulty == 'easy' else 'face_lose'])
         for tab in self.listeGameCells:
             for cell in tab:
                 if not(cell.revealed):
