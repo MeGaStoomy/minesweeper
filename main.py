@@ -1,6 +1,6 @@
 from tkinter import *
 from PIL import Image, ImageTk
-import random, os, atexit
+import random, os
 
 ####################
 
@@ -19,47 +19,144 @@ def load_textures(folder):
                 name = os.path.splitext(filename)[0]
                 path = os.path.join(folder, filename)
                 img = Image.open(path)
-                if name in ['face_lose', 'face_pressed', 'face_unpressed']:
+                if name in ['face_lose', 'face_pressed', 'face_unpressed', 'face_win']:
                     dictTextures[name + "_small"] = ImageTk.PhotoImage(img.resize( (45, 45), Image.Resampling.LANCZOS ), master=main)
                     img = Image.open(path).resize( (70, 70), Image.Resampling.LANCZOS)
-                elif img.size == (94,94):
+                elif img.size == (94 ,94):
                     img = img.resize( (38, 38), Image.Resampling.LANCZOS )
                 elif img.size == (541, 336):
                     img = img.resize( (146, 91), Image.Resampling.LANCZOS )
-                else:
+                elif (name != 'difficulty') and not((img.size == (136, 62)) or (img.size == (192, 62))):
                     img = img.resize( (40, 76), Image.Resampling.LANCZOS )
                 dictTextures[name] = ImageTk.PhotoImage(img, master=main)
         return dictTextures
 textures = load_textures('images')
 
 current_widget = None
+data = None
+def press(event):
+    if not(event.widget.cell.jeu.gameIsOver):
+        if event.widget.cell.revealed:
+            gameCellPress_Revealed(event)
+        else:
+            gameCellPress(event)
+def release(event):
+    if not(event.widget.cell.jeu.gameIsOver):
+        if event.widget.cell.revealed:
+            gameCellRelease_Revealed(event)
+        else:
+            gameCellRelease(event)
+def motion(event):
+    if not(event.widget.cell.jeu.gameIsOver):
+        if event.widget.cell.revealed:
+            gameCellMotion_Revealed(event)
+        else:
+            gameCellMotion(event)
 def gameCellPress(event):
-    if not(event.widget.cell.revealed) and not(event.widget.cell.flagged) and not(event.widget.cell.jeu.gameIsOver):
+    if not(event.widget.cell.flagged) and not(event.widget.cell.jeu.gameIsOver):
         global current_widget
         event.widget.config(image=textures['type0'])
         current_widget = event.widget
 def gameCellRelease(event):
-    if not(event.widget.cell.revealed) and not(event.widget.cell.flagged) and not(event.widget.cell.jeu.gameIsOver):
-        global current_widget
-        if (current_widget) and not(current_widget.cell.flagged) and (event.type == '35'):
+    if not(event.widget.cell.flagged) and not(event.widget.cell.jeu.gameIsOver):
+        global current_widget, data
+        if (current_widget) and not(current_widget.cell.flagged) and (event.type == '35') and not(current_widget.cell.revealed):
             current_widget.config(image=textures['closed'])
-        current_widget = event.widget.winfo_containing(event.x_root, event.y_root)
-        if (event.type == '5') and not(current_widget.cell.flagged):
+        x,y = main.winfo_pointerxy()
+        current_widget = main.winfo_containing(x,y)
+        try: current_widget.cell
+        except: return
+        if ((event.type == '5') or (data == '5')) and not(current_widget.cell.revealed) and (current_widget.cell.cellType == 'gameCell') and not(current_widget.cell.flagged):
             current_widget.cell.openArea()
+            current_widget.cell.jeu.checkForWin()
+            data = None
+        elif current_widget.cell.revealed:
+            if event.type == '5':
+                data = '5'
+            current_widget.event_generate("<<rLeave>>")
         else:
+            data = None
             event.widget.config(image=textures['closed'])
 def gameCellMotion(event):
-    if not(event.widget.cell.revealed) and not(event.widget.cell.flagged) and not(event.widget.cell.jeu.gameIsOver):
-        global current_widget
+    if not(event.widget.cell.flagged) and not(event.widget.cell.jeu.gameIsOver):
+        global current_widget, data
         # current_widget = widget under the mouse previously
-        widget = event.widget.winfo_containing(event.x_root, event.y_root)
+        x,y = main.winfo_pointerxy()
+        widget = main.winfo_containing(x,y)
         # widget = widget under the mouse currently
-        if (widget) and (widget.cell.cellType == 'gameCell') and (current_widget != widget):
-            if current_widget:
-                current_widget.event_generate("<<Leave>>")
+        try: widget.cell
+        except: return
+        if (widget) and (current_widget != widget):
+            if (current_widget):
+                if not(current_widget.cell.revealed):
+                    current_widget.event_generate("<<Leave>>")
+                else:
+                    current_widget.event_generate("<<rLeave>>")
             current_widget = widget
             # current_widget is updated
-            current_widget.event_generate("<<Enter>>")
+            if (current_widget.cell.cellType == 'gameCell'):
+                if not(current_widget.cell.revealed):
+                    current_widget.event_generate("<<Enter>>")
+                else:
+                    current_widget.event_generate("<<rEnter>>")
+def gameCellPress_Revealed(event):
+    if not(event.widget.cell.jeu.gameIsOver):
+        global current_widget
+        current_widget = event.widget
+        for i in range(3):
+            for j in [[-1, 0, 1], [-1, 1], [-1, 0, 1]][i]:
+                try:
+                    assert  (0 <= current_widget.cell.y-1+i < current_widget.cell.jeu.height-6) and (0 <= current_widget.cell.x+j < current_widget.cell.jeu.width-2)
+                    cell = current_widget.cell.jeu.listeGameCells[current_widget.cell.y-1+i][current_widget.cell.x+j]
+                    if not(cell.revealed) and not(cell.flagged):
+                        cell.label.config(image=textures['type0'])
+                except: pass
+def gameCellRelease_Revealed(event):
+    if not(event.widget.cell.jeu.gameIsOver):
+        global current_widget, data
+        for i in range(3):
+            for j in [[-1, 0, 1], [-1, 1], [-1, 0, 1]][i]:
+                try:
+                    assert  (0 <= current_widget.cell.y-1+i < current_widget.cell.jeu.height-6) and (0 <= current_widget.cell.x+j < current_widget.cell.jeu.width-2)
+                    cell = current_widget.cell.jeu.listeGameCells[current_widget.cell.y-1+i][current_widget.cell.x+j]
+                    if not(cell.revealed) and not(cell.flagged):
+                        cell.label.config(image=textures['closed'])
+                except: pass
+        x,y = main.winfo_pointerxy()
+        current_widget = main.winfo_containing(x,y)
+        try: current_widget.cell
+        except: return
+        if ((event.type == '5') or (data == '5')) and (current_widget.cell.cellType == 'gameCell'):
+            if not(current_widget.cell.revealed):
+                if event.type == '5':
+                    data = '5'
+                current_widget.event_generate("<<Leave>>")
+            else:
+                data = None
+                current_widget.cell.openNear()
+                current_widget.cell.jeu.checkForWin()
+def gameCellMotion_Revealed(event):
+    if not(event.widget.cell.jeu.gameIsOver):
+        global current_widget, data
+        # current_widget = widget under the mouse previously
+        x,y = main.winfo_pointerxy()
+        widget = main.winfo_containing(x,y)
+        # widget = widget under the mouse currently
+        try: widget.cell
+        except: return
+        if (widget) and (current_widget != widget):
+            if (current_widget):
+                if current_widget.cell.revealed:
+                    current_widget.event_generate("<<rLeave>>")
+                else:
+                    current_widget.event_generate("<<Leave>>")
+            current_widget = widget
+            # current_widget is updated
+            if (current_widget.cell.cellType == 'gameCell'):
+                if current_widget.cell.revealed:
+                    current_widget.event_generate("<<rEnter>>")
+                else:
+                    current_widget.event_generate("<<Enter>>")
 def gameCellFlag(event):
     if not(event.widget.cell.revealed) and not(event.widget.cell.jeu.gameIsOver):
         if event.widget.cell.flagged:
@@ -74,38 +171,52 @@ def gameCellFlag(event):
 def smileyFacePress(event):
     event.widget.config(image=textures['face_pressed_small' if event.widget.cell.jeu.difficulty == 'easy' else 'face_pressed'])
 def smileyFaceRelease(event):
+    global data
     event.widget.config(image=textures['face_unpressed_small' if event.widget.cell.jeu.difficulty == 'easy' else 'face_unpressed'])
     event.widget.cell.jeu.resetWindow()
+    data = None
     Jeu()
-    
 
 
 
 class Jeu:
     def __init__(self):
         self.askDifficulty()
+
+    def askDifficulty(self):
+        self.difficulty = None
+        self.createBorderCells()
+        Label(main, image=textures['difficulty'], bd=0, highlightthickness=0).place(relx=0.5, y=95, anchor=CENTER)
+        for i, difficulty in [(0, 'easy'), (1, 'normal'), (2, 'hard')]:
+            label = Label(main, image=textures[f"{difficulty}_unpressed"], bd=0, highlightthickness=0)
+            label.bind('<Button-1>', lambda event, d=difficulty: event.widget.config(image=textures[f"{d}_pressed"]))
+            label.bind('<ButtonRelease-1>', lambda event, d=difficulty: Jeu.setDifficulty(self, event, d))
+            label.place(relx=0.5, y=280+72*i, anchor=CENTER)
+        
+    def setDifficulty(self, event, difficulty):
+            x,y = main.winfo_pointerxy()
+            if event.widget == main.winfo_containing(x,y):
+                event.widget.config(image=textures[f'{difficulty}_unpressed'])
+                self.resetWindow()
+                self.gameIsOver = False
+                self.difficulty = difficulty
+                self.continue__init__()
+            else:
+                event.widget.config(image=textures[f"{difficulty}_unpressed"])
+        
+    def continue__init__(self):
         self.createBorderCells()
         self.createTopBarCells()
         self.createGameCells()
         self.placeMines()
         self.showMineCount()
         self.timer(-1)
-
-    def askDifficulty(self):
-        self.difficulty = None
-        self.createBorderCells()
-        while not(self.difficulty):
-            self.difficulty = input('Which difficulty ? (easy, normal, hard) : ')
-            if (self.difficulty != 'easy') and (self.difficulty != 'normal') and (self.difficulty != 'hard'):
-                self.difficulty = None
-                print('!Invalid answer!')
-        self.resetWindow()
-        self.gameIsOver = False
                 
     def createBorderCells(self):
         textures
         if (self.difficulty == 'easy') or (self.difficulty == None):
-            main.title('Minesweeper - Easy Difficulty')
+            if self.difficulty == 'easy':
+                main.title('Minesweeper - Easy Difficulty')
             self.width = 9+2
             self.height = 9+6
         elif self.difficulty == 'normal':
@@ -196,11 +307,13 @@ class Jeu:
             self.listeGameLabels.append([Label(main, image=textures['closed'], height=38, width=38, bd=0, highlightthickness=0) for _ in range(len(self.listeGameCells[0]))])
             for x in range(len(self.listeGameLabels[y])):
                 label = self.listeGameLabels[y][x]
-                label.bind('<Button-1>', gameCellPress)
-                label.bind('<ButtonRelease-1>', gameCellRelease)
-                label.bind('<B1-Motion>', gameCellMotion)
+                label.bind('<Button-1>', press)
+                label.bind('<ButtonRelease-1>', release)
+                label.bind('<B1-Motion>', motion)
                 label.bind('<<Enter>>', gameCellPress)
                 label.bind('<<Leave>>', gameCellRelease)
+                label.bind('<<rEnter>>', gameCellPress_Revealed)
+                label.bind('<<rLeave>>', gameCellRelease_Revealed)
                 label.bind('<Button-3>', gameCellFlag)
                 label.cell = self.listeGameCells[y][x]
                 self.listeGameCells[y][x].label = label
@@ -211,14 +324,17 @@ class Jeu:
         if self.difficulty == 'easy':
             self.mineCount = 10
         elif self.difficulty == 'normal':
-            self.mineCount = 40
+            self.mineCount = 25
         else:
-            self.mineCount = 80
+            self.mineCount = 65
         for _ in range(self.mineCount):
-            randHeight = random.randint(0, self.height-7)
-            randWidth = random.randint(0, self.width-3)
-            if not(self.listeGameCells[randHeight][randWidth].mine):
-                self.listeGameCells[randHeight][randWidth].mine = True
+            mineWasPlaced = False
+            while not(mineWasPlaced):
+                randHeight = random.randint(0, self.height-7)
+                randWidth = random.randint(0, self.width-3)
+                if not(self.listeGameCells[randHeight][randWidth].mine):
+                    self.listeGameCells[randHeight][randWidth].mine = True
+                    mineWasPlaced = True
 
     def showMineCount(self):
         textures
@@ -229,16 +345,16 @@ class Jeu:
             digNumbers[i].label.config(image=textures[f'd{mineCount[i]}'])
 
     def timer(self, time):
-        self.time = time
-        if not(time == 999):
-            self.time += 1
-        digNumbers = self.digNumbersList[1]
-        strTime = str(self.time)
-        strTime = "0"*(3-len(strTime)) + strTime
-        for i in range(3):
-            try: digNumbers[i].label.config(image=textures[f'd{strTime[i]}'])
-            except: pass
         if not(self.gameIsOver):
+            self.time = time
+            if not(time == 999):
+                self.time += 1
+            digNumbers = self.digNumbersList[1]
+            strTime = str(self.time)
+            strTime = "0"*(3-len(strTime)) + strTime
+            for i in range(3):
+                try: digNumbers[i].label.config(image=textures[f'd{strTime[i]}'])
+                except: pass
             main.after(1000, self.timer, self.time)
 
     def gameOver(self):
@@ -252,7 +368,21 @@ class Jeu:
                         cell.label.config(image=textures['mine'])
                     elif (cell.flagged) and not(cell.mine):
                         cell.label.config(image=textures['flag_wrong'])
-    
+
+    def checkForWin(self):
+        for tab in self.listeGameCells:
+            for cell in tab:
+                if not(cell.revealed) and not(cell.mine):
+                    return
+        self.gameIsOver = True
+        for tab in self.listeGameCells:
+            for cell in tab:
+                if not(cell.revealed) and not(cell.flagged):
+                    cell.label.config(image=textures['flag'])
+                    self.mineCount -= 1
+        self.showMineCount()
+        self.smileyFaceLabel.config(image=textures['face_win_small' if self.difficulty == 'easy' else 'face_win'])
+            
     def placeWindow(self):
         main.update_idletasks()  # Let Tk calculate window size
         w = main.winfo_width()
@@ -300,6 +430,7 @@ class Cell:
                             if self.jeu.listeGameCells[self.y+1-i][self.x+j].mine:
                                 nearbyMines += 1
                         except: pass
+                
                 self.label.config(image=textures[f'type{nearbyMines}'])
                 if nearbyMines == 0:
                     for i in range(3):
@@ -311,8 +442,42 @@ class Cell:
             elif self == current_widget.cell:
                 self.label.config(image=textures['mine_red'])
                 self.jeu.gameOver()
-        
-    
+
+    def openNear(self):
+        textures
+        if self.revealed:
+            nearbyFlags = 0
+            nearbyMines = 0
+            for i in range(3):
+                for j in [[-1, 0, 1], [-1, 1], [-1, 0, 1]][i]:
+                    try:
+                        assert  (0 <= self.y+1-i < self.jeu.height-6) and (0 <= self.x+j < self.jeu.width-2)
+                        if self.jeu.listeGameCells[self.y+1-i][self.x+j].flagged:
+                            nearbyFlags += 1
+                        if self.jeu.listeGameCells[self.y+1-i][self.x+j].mine:
+                            nearbyMines += 1
+                    except: pass
+            print(nearbyMines, nearbyFlags)
+            if not(nearbyMines == nearbyFlags):
+                return
+            else:
+                for i in range(3):
+                    for j in [[-1, 0, 1], [-1, 1], [-1, 0, 1]][i]:
+                        try:
+                            assert  (0 <= self.y+1-i < self.jeu.height-6) and (0 <= self.x+j < self.jeu.width-2)
+                            cell = self.jeu.listeGameCells[self.y+1-i][self.x+j]
+                            if ((cell.mine) and not(cell.flag)) or ((cell.flag) and not(cell.mine)):
+                                cell.revealed = True
+                                cell.label.config(image=textures['mine_red'])
+                                self.jeu.gameOver()
+                        except: pass
+                for i in range(3):
+                    for j in [[-1, 0, 1], [-1, 1], [-1, 0, 1]][i]:
+                        try:
+                            assert  (0 <= self.y+1-i < self.jeu.height-6) and (0 <= self.x+j < self.jeu.width-2)
+                            cell = self.jeu.listeGameCells[self.y+1-i][self.x+j]
+                            if not(cell.mine):
+                                cell.openArea()
+                        except: pass 
 
 Jeu()
-atexit.register(main.destroy)
