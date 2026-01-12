@@ -1,6 +1,6 @@
 from tkinter import *
 from PIL import Image, ImageTk
-import random, os
+import random, os, sys
 
 ####################
 
@@ -12,8 +12,15 @@ main.configure(background='#4c545c')
 
 global mouseDown
 
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 def load_textures(folder):
         dictTextures = {}
+        folder = resource_path(folder)
         for filename in os.listdir(folder):
             if filename.endswith(".png"):
                 name = os.path.splitext(filename)[0]
@@ -457,7 +464,6 @@ class Cell:
                         if self.jeu.listeGameCells[self.y+1-i][self.x+j].mine:
                             nearbyMines += 1
                     except: pass
-            print(nearbyMines, nearbyFlags)
             if not(nearbyMines == nearbyFlags):
                 return
             else:
@@ -466,10 +472,12 @@ class Cell:
                         try:
                             assert  (0 <= self.y+1-i < self.jeu.height-6) and (0 <= self.x+j < self.jeu.width-2)
                             cell = self.jeu.listeGameCells[self.y+1-i][self.x+j]
-                            if ((cell.mine) and not(cell.flag)) or ((cell.flag) and not(cell.mine)):
+                            if (cell.mine) and not(cell.flagged):
+                                print('L SKILL ISSUE COPE')
                                 cell.revealed = True
                                 cell.label.config(image=textures['mine_red'])
-                                self.jeu.gameOver()
+                                cell.jeu.gameOver()
+                                return
                         except: pass
                 for i in range(3):
                     for j in [[-1, 0, 1], [-1, 1], [-1, 0, 1]][i]:
@@ -478,6 +486,7 @@ class Cell:
                             cell = self.jeu.listeGameCells[self.y+1-i][self.x+j]
                             if not(cell.mine):
                                 cell.openArea()
-                        except: pass 
+                        except: pass
 
 Jeu()
+mainloop()
